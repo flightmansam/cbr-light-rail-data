@@ -50,6 +50,11 @@ fn data_handling(shared data SdData) {
 						}
 						last = now;
 					}
+		} else {
+			lock data {
+				data.data.feed_data = []transit_realtime.FeedEntity{}
+			}
+			
 		}
 		
 	}
