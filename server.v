@@ -21,7 +21,7 @@ struct App {
 
 pub fn (mut app App) before_request() {
 	app.add_header('Access-Control-Allow-Origin', '*')
-	println('[Vweb] ${app.Context.req.method} ${app.Context.req.url}')
+	// println('[Vweb] ${app.Context.req.method} ${app.Context.req.url}')
 }
 
 
@@ -43,7 +43,7 @@ fn data_handling(shared data SdData) {
 		}
 		
 		if (now - last_request).seconds() < request_alive_time_seconds {
-			if (now - last).seconds() > 150.0{
+			if (now - last).seconds() > 15.0{
 						new_data := get_live_data() or {[]transit_realtime.FeedEntity{}}
 						lock data {
 							data.data.feed_data = new_data

@@ -10,16 +10,17 @@ pub enum Status {
 }
 
 pub struct Location {
-mut:
+pub mut:
 	stop     Stop      // stop that vehicle is currently travelling to/is at
 	dest     Stop      // final stop of the route
+	trip_id  string
 	seq int       // how far along the published route the vehicle is (1 beginning .. n end)
 	status   Status // whether the vehicle is incoming_at, stopped_at, in_transit_to, scheduled current_stop
 }
 
 pub struct Arrival {
 	Location
-mut:
+pub mut:
 	time          time.Time // scheduled arrival time to current_stop (accounting for day rollover)
 	time_min      f32       // float minutes until arrival at current_stop
 }
