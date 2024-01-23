@@ -56,6 +56,8 @@ fn data_handling(shared data SdData) {
 			}
 			
 		}
+
+		time.sleep(1000)
 		
 	}
 }

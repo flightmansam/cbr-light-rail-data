@@ -27,14 +27,17 @@ pub fn get_live_data() ![]transit_realtime.FeedEntity {
 	lightrail_pb := os.join_path(temp_dir, 'lightrail.pb')
 
 	println('Downloading lightrail.pb...')
-	status := vibe.download_file('http://files.transport.act.gov.au/feeds/lightrail.pb', lightrail_pb) or {
+	response := vibe.download_file('http://files.transport.act.gov.au/feeds/lightrail.pb', lightrail_pb) or {
 		return []transit_realtime.FeedEntity{}
 	}
-	println(status)
+	print("status= ")
+	println(response.status)
 
 
 	live_file := os.read_bytes(lightrail_pb)!
+	println("bytes read")
 	unpacked := transit_realtime.feedmessage_unpack(live_file) or { return []transit_realtime.FeedEntity{} }
+	println("unpacked")
 	active := unpacked.entity
 	println('...done!')
 	return active
