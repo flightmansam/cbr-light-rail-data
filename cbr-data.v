@@ -6,9 +6,10 @@ import os
 import compress.szip { extract_zip_to_dir }
 import encoding.csv
 import utils
-import stops {Location, Arrival, Status, Stop}
+import stops {Location, Arrival, Status, Stop, get_dest, get_stop}
 import time
-
+import arrays
+import datatypes
 
 pub struct Data {
 pub mut:
@@ -53,13 +54,11 @@ pub fn get_data() !&Data {
 
 	lightrail_route_zip := os.join_path(temp_dir, 'route_info.zip')
 
-	if !os.exists(lightrail_route_zip) {
-		_ := vibe.download_file('https://www.transport.act.gov.au/googletransit/google_transit_lr.zip',
+	_ := vibe.download_file('https://www.transport.act.gov.au/googletransit/google_transit_lr.zip',
 			lightrail_route_zip)!
-		println('Downloading lightrail_route.zip...')
-		extract_zip_to_dir(lightrail_route_zip, temp_dir)!
-		println('Unzipping lightrail_route.zip...')
-	}
+	println('Downloading lightrail_route.zip...')
+	extract_zip_to_dir(lightrail_route_zip, temp_dir)!
+	println('Unzipping lightrail_route.zip...')
 
 	trips_file := os.read_file(os.join_path(temp_dir, 'trips.txt'))!
 	trips_decode := csv.decode[utils.Trips](trips_file)
@@ -68,7 +67,21 @@ pub fn get_data() !&Data {
 	stops_decode := csv.decode[utils.Stops](stops_file)
 
 	stops_times_file := os.read_file(os.join_path(temp_dir, 'stop_times.txt'))!
-	stops_times_decode := csv.decode[utils.Stop_times](stops_times_file)
+	mut stops_times_decode := csv.decode[utils.Stop_times](stops_times_file)
+
+	// join the service ID to the stop_times
+	mut trip_id_to_service_id := map[string]string{}
+	mut trip_id_to_direction_id := map[string]string{}
+	for i, trip in trips_decode{
+		trip_id_to_service_id[trip.trip_id] = trip.service_id
+		trip_id_to_direction_id[trip.trip_id] = trip.direction_id
+	}
+
+	for i, mut stop in stops_times_decode{
+		stop.service_id = trip_id_to_service_id[stop.trip_id]
+		stop.direction_id = trip_id_to_direction_id[stop.trip_id]
+		// stops_times_decode[i] = stop
+	}
 
 	data.feed_data = get_live_data()!
 	data.stop_times = stops_times_decode
@@ -95,21 +108,11 @@ pub fn get_locations(data &Data) []Location {
 		trip := data.trips.filter(it.trip_id==trip_id)
 		if trip_id.len > 0 {
 			route_id := trip[0].route_id
-			if route_id == 'ACTO001' {
-				route_dir := trip[0].direction_id
+			route_dir := trip[0].direction_id
+			stop := get_stop(route_id, route_dir, seq)
+			dest := get_dest(route_id, route_dir)
 
-				dest := match route_dir {
-					"1" {Stop.alg}
-					"0" {Stop.ggn}
-					else {Stop.nan}
-				}
-
-				stop := match route_dir {
-					"1" {stops.idx_to_stop[15 - seq]}
-					"0" {stops.idx_to_stop[seq]}
-					else {Stop.nan}
-				}
-
+			if stop != Stop.nan && dest != Stop.nan {
 				loc := Location{
 					stop: stop
 					dest: dest
@@ -118,11 +121,9 @@ pub fn get_locations(data &Data) []Location {
 					status: status
 				}
 				locations << loc
-				
-			} 
-			// else {
-			// 	println("[WARN]: '${route_id}' is a non standard route id! ")
-			// }	
+			}
+
+
 		}
 	}
 	return locations
@@ -130,7 +131,36 @@ pub fn get_locations(data &Data) []Location {
 
 
 pub fn get_arrivals(data &Data, seq int) []Arrival {
-	locations := get_locations(data)
+	mut locations := get_locations(data)
+	mut next_trips := datatypes.Set[string]{}
+	current_trips := locations.map(it.trip_id)
+
+	for i, loc in locations {
+		valid_trips := get_next_trip_ids(data, loc.trip_id)
+		for j, v in valid_trips{
+			if j <= 2 && v !in current_trips {
+				next_trips.add(v)
+			}
+		}
+	}
+
+	for nxt, _ in next_trips.elements {
+		trip := data.trips.filter(it.trip_id == nxt)
+		if trip.len > 0{
+			loc := Location{
+				stop: Stop.nan
+				dest: get_dest(trip[0].route_id, trip[0].direction_id)
+				trip_id: nxt
+				seq: 0
+				status: Status.scheduled
+			}
+			locations << loc
+
+		}
+
+
+	}
+
 	mut arrivals := []Arrival{}
 	n := time.now()
 	n_time_strip := n.ddmmy() // I HATE THAT I HAVE TO DO THIS!!
@@ -141,18 +171,18 @@ pub fn get_arrivals(data &Data, seq int) []Arrival {
 
 		if stop_times.len > 0 {
 			stop_time := stop_times[0]
-			mut hr := stop_time.arrival_time[0..2].int()
+			mut hr := stop_time.departure_time[0..2].int()
 			if (hr >= 24) {hr = hr - 24}
-			mut arrival_time := time.parse_format(n_time_strip + ' ' + '${hr:02}' +stop_time.arrival_time[2..stop_time.arrival_time.len],
+			mut departure_time := time.parse_format(n_time_strip + ' ' + '${hr:02}' +stop_time.departure_time[2..stop_time.departure_time.len],
 				'DD.MM.YYYY HH:mm:ss') or { time.now() } // V needs better ways to deal with time
-			if arrival_time.hour == 0 && n.hour == 23 {
-				arrival_time = arrival_time.add_days(1)
+			if departure_time.hour == 0 && n.hour == 23 {
+				departure_time = departure_time.add_days(1)
 			}
-			arrival_min := f32(arrival_time.unix_time() - n.unix_time()) / 60.0
+			departure_min := f32(departure_time.unix_time() - n.unix_time()) / 60.0
 			arr := Arrival{
 				Location:entity
-				time: arrival_time
-				time_min: arrival_min
+				time: departure_time
+				time_min: departure_min
 			}
 			arrivals << arr
 		}
@@ -162,22 +192,24 @@ pub fn get_arrivals(data &Data, seq int) []Arrival {
 	return arrivals
 }
 
-		// route_id
-		// current_status := entity.vehicle.current_status
-		// scheduled_stops := ctx.tcc_data.stop_times.filter(it.trip_id == trip_id
-		// 	&& it.stop_id == stop_id && it.stop_headsign == route_head_signs[ctx.selected_route])
-		// if scheduled_stops.len > 0 {
-		// 	scheduled_stop := scheduled_stops[0]
-		// 	stop_seq := scheduled_stop.stop_sequence.int()
+pub fn get_next_trip_ids(data &Data, trip_id string) []string {
 
-		// 	current_stop := match ctx.selected_route {
-		// 		.alg { idx_to_stop[15 - stop_seq] }
-		// 		.ggn { idx_to_stop[stop_seq] }
-		// 		else { Stop.alg }
-		// 	}
+	trip := data.trips.filter(it.trip_id == trip_id)[0]
+	stop := data.stop_times.filter(it.trip_id == trip_id)
+	tm := arrays.min(stop.map(it.arrival_time)) or {stop[0].arrival_time}
 
-		// 	mut arr := Arrival{
-		// 		current_stop: current_stop
-		// 		current_stop_seq: stop_seq
-		// 		current_status: current_status
-		// 	}
+	mut valid_trips := data.stop_times.filter(
+		it.service_id == trip.service_id && 
+		it.arrival_time >= tm && 
+		it.stop_sequence == '1' &&
+		it.direction_id == trip.direction_id)
+
+	if valid_trips.len > 0{
+		valid_trips.sort(a.arrival_time < b.arrival_time)
+		
+		return valid_trips.map(it.trip_id)
+	} 
+
+	return []
+
+}

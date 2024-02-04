@@ -26,14 +26,16 @@ pub:
 }
 
 pub struct Stop_times {
-pub:
+pub mut:
 	trip_id        string
 	arrival_time   string
 	departure_time string
 	stop_id        string
 	stop_sequence  string
 	stop_headsign  string
+	direction_id   string
 	pickup_type    string
 	drop_off_type  string
 	timepoint      string
+	service_id 	   string
 }

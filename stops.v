@@ -104,3 +104,52 @@ pub const idx_to_stop = {
 	13: Stop.mck
 	14: Stop.ggn
 }
+
+pub fn get_dest(route_id string, route_dir string) Stop {
+	if route_id == 'ACTO001' {
+		return match route_dir {
+			"1" {Stop.alg}
+			"0" {Stop.ggn}
+			else {Stop.nan}
+		}	
+	} else if route_id == 'X1'{
+		return match route_dir {
+			"1" {Stop.sfd}
+			"0" {Stop.ggn}
+			else {Stop.nan}
+		}
+	} else if route_id == 'X2'{
+		return match route_dir {
+			"1" {Stop.sfd}
+			"0" {Stop.epc}
+			else {Stop.nan}
+		}
+	} else {
+		return Stop.nan
+	}
+}
+
+pub fn get_stop(route_id string, route_dir string, seq int) Stop {
+	if route_id == 'ACTO001' {
+		return match route_dir {
+			"1" {stops.idx_to_stop[15 - seq]}
+			"0" {stops.idx_to_stop[seq]}
+			else {Stop.nan}
+		}
+		
+	} else if route_id == 'X1'{
+		return match route_dir {
+			"1" {stops.idx_to_stop[15 - seq]}
+			"0" {stops.idx_to_stop[seq]}
+			else {Stop.nan}
+		}
+	} else if route_id == 'X2'{
+		return match route_dir {
+			"1" {stops.idx_to_stop[15 - seq]}
+			"0" {stops.idx_to_stop[seq]}
+			else {Stop.nan}
+		}
+	} else {
+		return Stop.nan
+	}
+}
