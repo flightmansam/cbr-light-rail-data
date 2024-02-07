@@ -27,6 +27,10 @@ pub fn get_live_data() ![]transit_realtime.FeedEntity {
 
 	lightrail_pb := os.join_path(temp_dir, 'lightrail.pb')
 
+	if os.exists(lightrail_pb){
+		os.rm(lightrail_pb)!
+	}
+
 	println('Downloading lightrail.pb...')
 	response := vibe.download_file('http://files.transport.act.gov.au/feeds/lightrail.pb', lightrail_pb) or {
 		return []transit_realtime.FeedEntity{}
