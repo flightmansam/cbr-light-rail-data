@@ -54,6 +54,10 @@ pub fn get_data() !&Data {
 
 	lightrail_route_zip := os.join_path(temp_dir, 'route_info.zip')
 
+	if os.exists(lightrail_route_zip){
+		os.rm(lightrail_route_zip)!
+	}
+
 	_ := vibe.download_file('https://www.transport.act.gov.au/googletransit/google_transit_lr.zip',
 			lightrail_route_zip)!
 	println('Downloading lightrail_route.zip...')
