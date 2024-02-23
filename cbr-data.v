@@ -31,20 +31,15 @@ pub fn get_live_data() ![]transit_realtime.FeedEntity {
 		os.rm(lightrail_pb)!
 	}
 
-	println('Downloading lightrail.pb...')
+	print('Downloading lightrail.pb...')
 	response := vibe.download_file('http://files.transport.act.gov.au/feeds/lightrail.pb', lightrail_pb) or {
 		return []transit_realtime.FeedEntity{}
 	}
-	print("status= ")
-	println(response.status)
 
-
-	live_file := os.read_bytes(lightrail_pb)!
-	println("bytes read")
+	live_file := read_bytes(lightrail_pb)!
 	unpacked := transit_realtime.feedmessage_unpack(live_file) or { return []transit_realtime.FeedEntity{} }
-	println("unpacked")
 	active := unpacked.entity
-	println('...done!')
+	println("done.")
 	return active
 }
 
@@ -62,11 +57,14 @@ pub fn get_data() !&Data {
 		os.rm(lightrail_route_zip)!
 	}
 
+	print('Downloading lightrail_route.zip...')
 	_ := vibe.download_file('https://www.transport.act.gov.au/googletransit/google_transit_lr.zip',
 			lightrail_route_zip)!
-	println('Downloading lightrail_route.zip...')
+	println('done.')
+
+	print('Unzipping lightrail_route.zip...')
 	extract_zip_to_dir(lightrail_route_zip, temp_dir)!
-	println('Unzipping lightrail_route.zip...')
+	print('done.')
 
 	trips_file := os.read_file(os.join_path(temp_dir, 'trips.txt'))!
 	trips_decode := csv.decode[utils.Trips](trips_file)
@@ -220,4 +218,35 @@ pub fn get_next_trip_ids(data &Data, trip_id string) []string {
 
 	return []
 
+}
+
+fn read_bytes(path string) ![]u8 {
+
+	def := []u8
+
+	if !os.exists(path) {
+		return def
+	}
+
+	mut fp := os.open_file(path, 'rb') or {
+		eprintln("Failed to open the file: $err")
+		return def
+	}
+
+	fsize := os.file_size(path)
+	
+	if fsize == 0 {
+		eprintln("file size 0, need to slurp this")
+		return def
+	}
+
+	res := fp.read_bytes(int(fsize))
+	nr_read_elements := res.len
+
+	if nr_read_elements == 0 && fsize > 0 {
+		return error('read failed')
+	}
+
+	fp.close()
+	return res
 }
