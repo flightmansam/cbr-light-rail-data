@@ -64,7 +64,7 @@ pub fn get_data() !&Data {
 
 	print('Unzipping lightrail_route.zip...')
 	extract_zip_to_dir(lightrail_route_zip, temp_dir)!
-	print('done.')
+	println('done.')
 
 	trips_file := os.read_file(os.join_path(temp_dir, 'trips.txt'))!
 	trips_decode := csv.decode[utils.Trips](trips_file)
