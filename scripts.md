@@ -7,5 +7,7 @@ v -d vweb_livereload watch run .
 
 ## vweb build
 
+v -d vweb crun .
+
 v -c vweb run .
 
