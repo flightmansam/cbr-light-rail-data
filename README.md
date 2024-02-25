@@ -7,7 +7,7 @@ This API is written using vlang/V. There reason I chose to use it is I wanted a 
 
 ## The API
 
-### /live - Get anything active on the route.
+### `/live` - Get anything active on the route.
 
 E.g. `https://data.cbr-transport.au/live` returns:
 ```json
@@ -21,7 +21,7 @@ E.g. `https://data.cbr-transport.au/live` returns:
 
 
 
-### /arrivals/<stop_idx> - Get anything active on the route.
+### `/arrivals/<stop_idx>` - Get anything active on the route.
 
 E.g. `https://data.cbr-transport.au/arrivals/1` is for all of the scheduled arrivals for Alinga Street and returns:
 ```json
