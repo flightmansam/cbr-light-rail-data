@@ -28,9 +28,9 @@ E.g. `https://data.cbr-transport.au/live` returns:
 
 
 ### `/arrivals/<stop_idx>` - Get any scheduled arrivals for this particular stop.
-stop_idx is an int between 1 and 14 for each consecutive stop on the current Canberra Light Rail network. 1 is Alinga Street and 14 is Gungahlin Place. 
+stop_idx is an int between 1 and 14 for each consecutive stop on the current Canberra Light Rail network. 1 is Gungahlin Place and 14 is Alinga Street. 
 
-E.g. `https://data.cbr-transport.au/arrivals/1` is for all of the scheduled arrivals for Alinga Street and returns:
+E.g. `https://data.cbr-transport.au/arrivals/14` is for all of the scheduled arrivals for Alinga Street and returns:
 ```jsonc
 [
   {
