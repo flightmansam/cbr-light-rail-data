@@ -1,3 +1,2 @@
 **/*.DS_Store
-back_end
-cbr-light-rail-data
+**/*.pyc
