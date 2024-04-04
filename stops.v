@@ -72,6 +72,7 @@ const stop_short_names = {
 }
 
 pub const stop_to_idx = {
+	Stop.alg: 1
 	Stop.ela: 2
 	Stop.ipa: 3
 	Stop.mcr: 4

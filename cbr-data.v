@@ -31,7 +31,7 @@ pub fn get_live_data() ![]transit_realtime.FeedEntity {
 		os.rm(lightrail_pb)!
 	}
 
-	print('Downloading lightrail.pb...')
+	println('Downloading lightrail.pb...')
 	response := vibe.download_file('http://files.transport.act.gov.au/feeds/lightrail.pb', lightrail_pb) or {
 		return []transit_realtime.FeedEntity{}
 	}
@@ -247,6 +247,6 @@ fn read_bytes(path string) ![]u8 {
 		return error('read failed')
 	}
 
-	fp.close()
+		fp.close()
 	return res
 }
