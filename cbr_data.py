@@ -42,8 +42,8 @@ def get_data() -> Data:
 
     data = Data()
 
-    # lightrail_route = get_curl_bytes(GTFS_ROUTE_URL)
-    lightrail_route = 'google_transit_lr.zip'
+    lightrail_route = get_curl_bytes(GTFS_ROUTE_URL)
+    # lightrail_route = 'google_transit_lr.zip'
     try:
         with ZipFile(lightrail_route, 'r') as zf:
             data.trips = load_route_file_csv('trips.txt', zf)
