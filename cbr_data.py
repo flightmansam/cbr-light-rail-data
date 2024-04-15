@@ -18,7 +18,8 @@ def get_curl_bytes(url: str) -> BytesIO:
     c.setopt(c.WRITEDATA, buffer)
     c.perform()
 
-    if c.getinfo(pycurl.RESPONSE_CODE) not in [200, 301]:
+    print(c.getinfo(pycurl.RESPONSE_CODE))
+    if c.getinfo(pycurl.RESPONSE_CODE) not in [200, 410, 301]:
         return BytesIO()
 
     c.close()    
@@ -42,9 +43,8 @@ def get_data() -> Data:
 
     data = Data()
 
-    lightrail_route = get_curl_bytes(GTFS_ROUTE_URL)
-    # lightrail_route = 'google_transit_lr.zip'
     try:
+        lightrail_route = get_curl_bytes(GTFS_ROUTE_URL)
         with ZipFile(lightrail_route, 'r') as zf:
             data.trips = load_route_file_csv('trips.txt', zf)
             data.stops = load_route_file_csv('stops.txt', zf)
@@ -57,7 +57,23 @@ def get_data() -> Data:
         
 
     except BadZipFile as e:
-        print(e)
+        lightrail_route = 'google_transit_lr.zip'
+
+        with ZipFile(lightrail_route, 'r') as zf:
+            data.trips = load_route_file_csv('trips.txt', zf)
+            data.stops = load_route_file_csv('stops.txt', zf)
+            data.stop_times = load_route_file_csv('stop_times.txt', zf)
+        
+        # Join serviceID and direction to stop times
+        data.stop_times = data.trips[['trip_id', 'service_id', 'direction_id']].merge(data.stop_times, left_on='trip_id', right_on='trip_id')
+
+        data.feed_data = get_live_data()
+        
+
+    else:
+        return data    
+
+
 
     return data
 
@@ -85,7 +101,7 @@ def get_next_trip_ids(data: Data, trip_id: str) -> List[str]:
 
     valid_trips: DataFrame = data.stop_times.loc[
         (data.stop_times.service_id == trip.service_id) &
-        (data.stop_times.arrival_time == tm) &
+        (data.stop_times.arrival_time >= tm) &
         (data.stop_times.stop_sequence == 1) &
         (data.stop_times.direction_id == trip.direction_id) ]
     if valid_trips.shape[0] > 0:
@@ -127,12 +143,13 @@ def get_locations(data: Data) -> List[Location]:
 def get_arrivals(data: Data, seq: int) -> List[Arrival]:
     locations = get_locations(data)
     next_trips = set()
-    current_trips = [l.trip_id for l in locations]
+    current_trips = [str(l.trip_id) for l in locations]
 
     for loc in locations:
         valid_trips = get_next_trip_ids(data, loc.trip_id)
         for i, v in enumerate(valid_trips):
-            if i <= 2 and v not in current_trips: next_trips.add(v)
+            v = str(v)
+            if i <= 4 and v not in current_trips: next_trips.add(v)
 
     for nxt in next_trips:
         trip = data.trips.loc[data.trips.trip_id == int(nxt)]
