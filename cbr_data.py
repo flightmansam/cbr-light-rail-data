@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import List
 from google.transit import gtfs_realtime_pb2
 from zipfile import ZipFile, BadZipFile
@@ -183,7 +183,7 @@ def get_arrivals(data: Data, seq: int) -> List[Arrival]:
             sec = int(stop_time[6:8])
 
             departure_time = datetime.combine(n.date(), time(hour=hr, minute=mn, second=sec))
-            if departure_time.hour == 0 and n.time.hour == 23:
+            if departure_time.hour == 0 and n.hour == 23:
                 departure_time += timedelta(days=1)
 
             departure_min = (departure_time - n).total_seconds() / 60.0
