@@ -89,6 +89,7 @@ def get_dest(route_id, route_dir):
         case _: return Stop.nan
 
 def get_stop(route_dir, seq):
+    if (seq == 0): return Stop.nan
     match route_dir:
         case 1: return Stop(15 - seq)
         case 0: return Stop(seq)
@@ -116,6 +117,7 @@ def get_locations(data: Data) -> List[Location]:
     for i, entity in enumerate(data.feed_data):
         trip_id = entity.vehicle.trip.trip_id
         if trip_id == '': continue
+        if any(c.isalpha() for c in trip_id): continue
         stop_id = entity.vehicle.stop_id
         seq = entity.vehicle.current_stop_sequence
         status = Status(entity.vehicle.current_status)
