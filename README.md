@@ -19,7 +19,7 @@ E.g. `https://data.cbr-transport.au/live` returns:
     "dest": "alg",         // final destination
     "trip_id": "204",      // Transport Canberra trip id
     "seq": 4,              // how long along the route
-    "status": "stopped_at" //status of the trip 
+    "status": "stopped_at" // status of the trip 
   },
   ...
 ]
@@ -39,7 +39,7 @@ E.g. `https://data.cbr-transport.au/arrivals/14` is for all of the scheduled arr
       "dest": "ggn",            // final destination
       "trip_id": "73",          // Transport Canberra trip id
       "seq": 8,                 // how long along the route
-      "status": "in_transit_to" //status of the trip 
+      "status": "in_transit_to" // status of the trip 
     },
     "time": 1708947000, // scheduled arrival time at this stop
     "time_min": 2.57    // minutes from now 
