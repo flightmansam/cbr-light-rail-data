@@ -39,6 +39,27 @@ def get_live_data() -> list:
 
     return feed.entity    
 
+def build_trip_index(data: Data) -> pd.DataFrame:
+    # First stop for each trip (assuming stop_sequence=1 is the start)
+    first_stops = data.stop_times[data.stop_times.stop_sequence == 1][
+        ['trip_id', 'arrival_time', 'departure_time']
+    ]
+    
+    trips = data.trips[['trip_id', 'route_id', 'service_id', 'direction_id']]
+    
+    idx = trips.merge(first_stops, on='trip_id', how='inner')
+    
+    # Use departure_time as "trip start" (fall back to arrival_time if needed)
+    t = idx['departure_time'].fillna(idx['arrival_time'])
+    idx['start_td'] = pd.to_timedelta(t)  # "HH:MM:SS" -> timedelta
+    
+    # For fast searching, sort by route/direction/service/start time
+    idx.sort_values(['route_id', 'direction_id', 'service_id', 'start_td'], inplace=True)
+    idx.reset_index(drop=True, inplace=True)
+    
+    return idx
+
+
 def get_data() -> Data:
 
     data = Data()
@@ -54,9 +75,11 @@ def get_data() -> Data:
         data.stop_times = data.trips[['trip_id', 'service_id', 'direction_id']].merge(data.stop_times, left_on='trip_id', right_on='trip_id')
 
         data.feed_data = get_live_data()
+        data.trip_index = build_trip_index(data)
         
 
     except BadZipFile as e:
+        print("using fallback zip")
         lightrail_route = 'google_transit_lr.zip'
 
         with ZipFile(lightrail_route, 'r') as zf:
@@ -68,6 +91,7 @@ def get_data() -> Data:
         data.stop_times = data.trips[['trip_id', 'service_id', 'direction_id']].merge(data.stop_times, left_on='trip_id', right_on='trip_id')
 
         data.feed_data = get_live_data()
+        data.trip_index = build_trip_index(data)
         
 
     else:
@@ -96,19 +120,31 @@ def get_stop(route_dir, seq):
         case _:   return Stop.nan
 
 def get_next_trip_ids(data: Data, trip_id: str) -> List[str]:
-    trip = data.trips.loc[data.trips.trip_id == int(trip_id)].iloc[0]
-    stop = data.stop_times.loc[data.stop_times.trip_id == int(trip_id)]
-    tm = stop.arrival_time.min()
+    trip_id_int = int(trip_id)
+    idx = data.trip_index
+    
+    row = idx.loc[idx.trip_id == trip_id_int]
+    if row.empty:
+        return []
+    row = row.iloc[0]
+    
+    route_id = row.route_id
+    direction_id = row.direction_id
+    service_id = row.service_id
+    start_td = row.start_td
 
-    valid_trips: DataFrame = data.stop_times.loc[
-        (data.stop_times.service_id == trip.service_id) &
-        (data.stop_times.arrival_time >= tm) &
-        (data.stop_times.stop_sequence == 1) &
-        (data.stop_times.direction_id == trip.direction_id) ]
-    if valid_trips.shape[0] > 0:
-        valid_trips.sort_values(by='arrival_time', inplace=True)
+    candidates = idx.loc[
+        (idx.route_id == route_id) &
+        (idx.direction_id == direction_id) &
+        (idx.service_id == service_id) &
+        (idx.start_td >= start_td)
+    ]
 
-        return valid_trips.trip_id.to_list()
+    candidates.sort_values('start_td', inplace=True)
+    print(candidates)
+
+    return candidates.trip_id.astype(str).tolist()
+
 
 def get_locations(data: Data) -> List[Location]:
 
@@ -201,7 +237,7 @@ def get_arrivals(data: Data, seq: int) -> List[Arrival]:
             )
             arrivals.append(arrival)
 
-    return arrivals
+    return sorted(arrivals, key=lambda arr: arr.time_min)
 
 
 if __name__ == "__main__":

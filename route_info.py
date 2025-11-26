@@ -9,6 +9,7 @@ class Data:
     trips:      pd.DataFrame = field(default_factory=pd.DataFrame)
     stop_times: pd.DataFrame = field(default_factory=pd.DataFrame)
     stops:      pd.DataFrame = field(default_factory=pd.DataFrame)
+    trip_index: list = field(default_factory=list)
 
 class Stop(IntEnum):
     alg = 1
