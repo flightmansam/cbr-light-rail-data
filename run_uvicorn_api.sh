@@ -1,0 +1,1 @@
+uv run --env-file .env uvicorn main:app --port 4050

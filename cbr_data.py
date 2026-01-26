@@ -5,20 +5,24 @@ from zipfile import ZipFile, BadZipFile
 import pycurl
 from io import BytesIO
 import pandas as pd
+import os
 
 from route_info import *
 
-GTFS_RT_URL =    'http://files.transport.act.gov.au/feeds/lightrail.pb'
-GTFS_ROUTE_URL = 'https://www.transport.act.gov.au/googletransit/google_transit_lr.zip'
+GTFS_RT_URL =    'https://transport.api.act.gov.au/gtfs/data/gtfs/v2/vehicle-positions.pb'
+GTFS_ROUTE_URL = 'https://transport.api.act.gov.au/gtfs/data/gtfs/v2/google_transit.zip'
+
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
 def get_curl_bytes(url: str) -> BytesIO:
     buffer = BytesIO()
     c: Curl = pycurl.Curl()
     c.setopt(c.URL, url)
     c.setopt(c.WRITEDATA, buffer)
+    c.setopt(c.USERPWD, f'{CLIENT_ID}:{CLIENT_SECRET}')
     c.perform()
 
-    print(c.getinfo(pycurl.RESPONSE_CODE))
     if c.getinfo(pycurl.RESPONSE_CODE) not in [200, 410, 301]:
         return BytesIO()
 
@@ -76,36 +80,19 @@ def get_data() -> Data:
 
         data.feed_data = get_live_data()
         data.trip_index = build_trip_index(data)
-        
-
+   
     except BadZipFile as e:
-        print("using fallback zip")
-        lightrail_route = 'google_transit_lr.zip'
-
-        with ZipFile(lightrail_route, 'r') as zf:
-            data.trips = load_route_file_csv('trips.txt', zf)
-            data.stops = load_route_file_csv('stops.txt', zf)
-            data.stop_times = load_route_file_csv('stop_times.txt', zf)
-        
-        # Join serviceID and direction to stop times
-        data.stop_times = data.trips[['trip_id', 'service_id', 'direction_id']].merge(data.stop_times, left_on='trip_id', right_on='trip_id')
-
+        print("something wrong with google_transit zip file, next_arrivals unavailable") 
         data.feed_data = get_live_data()
-        data.trip_index = build_trip_index(data)
-        
-
-    else:
-        return data    
-
+        data.trip_index = pd.DataFrame()
 
 
     return data
 
 def get_dest(route_id, route_dir):
-    print(type(route_id), type(route_dir))
     match (route_id, route_dir):
-        case ('ACTO001', 1): return Stop.alg
-        case ('ACTO001', 0): return Stop.ggn
+        case ('1', 1): return Stop.alg
+        case ('1', 0): return Stop.ggn
         case ('X1',      1): return Stop.sfd
         case ('X1',      0): return Stop.ggn
         case ('X2',      1): return Stop.sfd
@@ -120,30 +107,24 @@ def get_stop(route_dir, seq):
         case _:   return Stop.nan
 
 def get_next_trip_ids(data: Data, trip_id: str) -> List[str]:
-    trip_id_int = int(trip_id)
     idx = data.trip_index
-    
-    row = idx.loc[idx.trip_id == trip_id_int]
+    row = idx.loc[idx.trip_id == trip_id]
     if row.empty:
         return []
     row = row.iloc[0]
-    
     route_id = row.route_id
     direction_id = row.direction_id
     service_id = row.service_id
     start_td = row.start_td
-
     candidates = idx.loc[
         (idx.route_id == route_id) &
         (idx.direction_id == direction_id) &
         (idx.service_id == service_id) &
         (idx.start_td >= start_td)
     ]
-
-    candidates.sort_values('start_td', inplace=True)
-    print(candidates)
-
-    return candidates.trip_id.astype(str).tolist()
+    candidates = candidates.sort_values('start_td')
+    next_trip_ids = candidates.trip_id.astype(str).tolist()
+    return next_trip_ids
 
 
 def get_locations(data: Data) -> List[Location]:
@@ -154,28 +135,25 @@ def get_locations(data: Data) -> List[Location]:
         trip_id = entity.vehicle.trip.trip_id
         if trip_id == '': continue
         if any(c.isalpha() for c in trip_id): continue
+        if entity.vehicle.vehicle.id[0:3] != 'LRV': continue
         stop_id = entity.vehicle.stop_id
         seq = entity.vehicle.current_stop_sequence
         status = Status(entity.vehicle.current_status)
-        trip = data.trips.loc[data.trips.trip_id == int(trip_id)]
+        trip = entity.vehicle.trip
+        route_id = trip.route_id
+        route_dir = trip.direction_id
+        stop = get_stop(route_dir, seq)
+        dest = get_dest(route_id, route_dir)
 
-        if trip.shape[0] > 0:
-            trip = trip.iloc[0]
-            route_id = trip.route_id
-            route_dir = trip.direction_id
-            stop = get_stop(route_dir, seq)
-            dest = get_dest(route_id, route_dir)
-
-            if stop != Stop.nan and dest != Stop.nan:
-                loc = Location(
-                    stop=stop,
-                    dest=dest,
-                    trip_id=trip_id,
-                    seq=seq,
-                    status=status
-                )
-                locations.append(loc)
-    
+        if stop != Stop.nan and dest != Stop.nan:
+            loc = Location(
+                stop=stop,
+                dest=dest,
+                trip_id=trip_id,
+                seq=seq,
+                status=status
+            )
+            locations.append(loc)
     return locations   
 
 def get_arrivals(data: Data, seq: int) -> List[Arrival]:
@@ -190,7 +168,7 @@ def get_arrivals(data: Data, seq: int) -> List[Arrival]:
             if i <= 4 and v not in current_trips: next_trips.add(v)
 
     for nxt in next_trips:
-        trip = data.trips.loc[data.trips.trip_id == int(nxt)]
+        trip = data.trips.loc[data.trips.trip_id == nxt]
 
         if trip.shape[0] > 0:
             trip = trip.iloc[0]
@@ -209,7 +187,7 @@ def get_arrivals(data: Data, seq: int) -> List[Arrival]:
     for loc in locations:
         
         stop_times = data.stop_times.loc[
-            (data.stop_times.trip_id == int(loc.trip_id)) & 
+            (data.stop_times.trip_id == loc.trip_id) & 
             (data.stop_times.stop_sequence == int(seq))]
 
         if stop_times.shape[0] > 0:
